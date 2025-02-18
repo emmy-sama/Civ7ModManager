@@ -1,0 +1,3 @@
+PyQt6>=6.6.0  # For the GUI
+pathlib>=1.0.1  # For cross-platform path handling
+pyyaml>=6.0.1  # For config file handling
