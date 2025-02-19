@@ -1,3 +1,6 @@
-PyQt6>=6.6.0  # For the GUI
-pathlib>=1.0.1  # For cross-platform path handling
-pyyaml>=6.0.1  # For config file handling
+PyQt6>=6.0.0
+pathlib>=1.0.1
+pyyaml>=6.0.1
+py7zr>=0.20.5
+rarfile>=4.0
+patool>=1.12
