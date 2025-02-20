@@ -48,6 +48,7 @@ class ModInfo:
         modinfo_files = list(self.path.glob("*.modinfo"))
         if not modinfo_files:
             print(f"No .modinfo file found for {self.folder_name}")
+            self.metadata['display_name'] = f"{self.folder_name}--ModInfo File Broken"
             return
 
         try:
@@ -116,6 +117,8 @@ class ModInfo:
 
         except Exception as e:
             print(f"Error loading metadata for {self.folder_name}: {e}")
+            self.metadata['display_name'] = self.folder_name
+            self.metadata['id'] = "ModInfo File Broken"
 
     def _get_element_text(self, parent, tag):
         """Helper method to safely get element text"""
