@@ -117,8 +117,6 @@ class ArchiveHandler:
             else:
                 # .modinfo is in a subfolder, move that folder to target
                 mod_root = modinfo_path.parent
-                while mod_root.parent != temp_extract and mod_root.parent != temp_extract.parent:
-                    mod_root = mod_root.parent
                 
                 target_mod_path = target_path / mod_name
                 if target_mod_path.exists():

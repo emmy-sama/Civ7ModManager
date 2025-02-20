@@ -97,6 +97,7 @@ class Civ7ModManager(QMainWindow):
         # Add buttons
         refresh_button = QPushButton("Refresh Mod List")
         install_button = QPushButton("Install Mod")
+        install_folder_button = QPushButton("Install Folder")  # New button
         save_profile_button = QPushButton("Save Profile")
         load_profile_button = QPushButton("Load Profile")
         deploy_button = QPushButton("Deploy Mods")
@@ -106,13 +107,14 @@ class Civ7ModManager(QMainWindow):
         # Connect button signals
         refresh_button.clicked.connect(self.refresh_mod_list)
         install_button.clicked.connect(self.install_mod)
+        install_folder_button.clicked.connect(self.install_mod_folder)  # New connection
         save_profile_button.clicked.connect(self.save_profile)
         load_profile_button.clicked.connect(self.load_profile)
         deploy_button.clicked.connect(self.deploy_mods)
         clear_log_button.clicked.connect(self.log_viewer.clear)
         
         # Add buttons to layout
-        for button in [refresh_button, install_button, save_profile_button, 
+        for button in [refresh_button, install_button, install_folder_button, save_profile_button, 
                       load_profile_button, deploy_button, clear_log_button]:
             button_layout.addWidget(button)
         
@@ -364,6 +366,84 @@ class Civ7ModManager(QMainWindow):
             QMessageBox.critical(self, "Error", error_msg)
         except Exception as e:
             error_msg = f"Failed to install mod: {str(e)}"
+            self.logger.error(error_msg)
+            QMessageBox.critical(self, "Error", error_msg)
+        finally:
+            self.progress_bar.hide()
+
+    def install_mod_folder(self):
+        """Install multiple mods from a folder"""
+        folder_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Folder Containing Mod Archives",
+            ""
+        )
+        
+        if not folder_path:
+            return
+            
+        try:
+            folder_path = Path(folder_path)
+            self.logger.info(f"Installing mods from folder: {folder_path}")
+            
+            # Find all mod archives in the folder
+            mod_files = []
+            for ext in ['.zip', '.7z', '.rar', '.r00']:
+                mod_files.extend(folder_path.glob(f'*{ext}'))
+            
+            if not mod_files:
+                QMessageBox.information(self, "No Mods Found", "No mod archives found in the selected folder.")
+                return
+            
+            total_mods = len(mod_files)
+            self.progress_bar.setMaximum(total_mods)
+            self.progress_bar.setValue(0)
+            self.progress_bar.show()
+            
+            successful_installs = 0
+            failed_installs = []
+            
+            for i, file_path in enumerate(sorted(mod_files)):
+                mod_name = None  # Initialize mod_name for each iteration
+                try:
+                    self.logger.info(f"Installing mod from: {file_path}")
+                    
+                    # Get archive type and check support
+                    archive_type = ArchiveHandler.get_archive_type(str(file_path))
+                    if not ArchiveHandler.is_format_supported(archive_type):
+                        raise ValueError(f"Archive format '{archive_type}' is not supported for {file_path.name}")
+                    
+                    # Extract the mod folder
+                    mod_name = ArchiveHandler.extract_mod_folder(str(file_path), self.storage_path)
+                    if not mod_name:
+                        raise ValueError(f"Could not determine mod folder name for {file_path.name}")
+                    
+                    self.logger.info(f"Successfully installed: {mod_name}")
+                    successful_installs += 1
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to install {file_path.name}: {str(e)}")
+                    failed_installs.append((file_path.name, str(e)))
+                    # Clean up any partial installation
+                    if mod_name and (self.storage_path / mod_name).exists():
+                        shutil.rmtree(self.storage_path / mod_name)
+                
+                self.progress_bar.setValue(i + 1)
+            
+            # Show results
+            result_message = f"Successfully installed {successful_installs} mod{'s' if successful_installs != 1 else ''}"
+            if failed_installs:
+                result_message += "\n\nFailed installations:"
+                for mod_name, error in failed_installs:
+                    result_message += f"\n- {mod_name}: {error}"
+            
+            if successful_installs > 0:
+                self.refresh_mod_list()
+            
+            QMessageBox.information(self, "Installation Complete", result_message)
+            
+        except Exception as e:
+            error_msg = f"Failed to process mod folder: {str(e)}"
             self.logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
         finally:
