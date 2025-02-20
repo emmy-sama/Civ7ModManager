@@ -21,6 +21,27 @@ class ModInfo:
         }
         self._load_metadata()
 
+    def _get_localized_name(self, name_tag):
+        """Load localized name from the mod's localization file"""
+        loc_file_path = self.path / "text" / "en_us" / "ModuleText.xml"
+        if not loc_file_path.exists():
+            return None
+
+        try:
+            tree = ET.parse(loc_file_path)
+            root = tree.getroot()
+            
+            # Look for the name in the localization file
+            for row in root.findall('.//EnglishText//Row'):
+                tag = row.get('Tag')
+                if tag and tag == name_tag:
+                    text_element = row.find('.//Text')
+                    if text_element is not None and text_element.text:
+                        return text_element.text.strip()
+        except Exception as e:
+            print(f"Error loading localization for {self.folder_name}: {e}")
+        return None
+
     def _load_metadata(self):
         """Load metadata from .modinfo file"""
         # Look for .modinfo file in the mod directory
@@ -47,7 +68,20 @@ class ModInfo:
             # Get properties
             properties = root.find(f'.//{ns_prefix}Properties')
             if properties is not None:
-                self.metadata['display_name'] = self._get_element_text(properties, f'{ns_prefix}Name') or self.folder_name
+                name_element = properties.find(f'{ns_prefix}Name')
+                if name_element is not None:
+                    # First try to get the name directly
+                    direct_name = self._get_element_text(properties, f'{ns_prefix}Name')
+                    # If the name element has a 'Tag' attribute, try to get localized name
+                    if direct_name[0:4] == 'LOC_':
+                        localized_name = self._get_localized_name(direct_name)
+                        if localized_name:
+                            self.metadata['display_name'] = localized_name
+                        else:
+                            self.metadata['display_name'] = direct_name or self.folder_name
+                    else:
+                        self.metadata['display_name'] = direct_name or self.folder_name
+                
                 self.metadata['description'] = self._get_element_text(properties, f'{ns_prefix}Description')
                 self.metadata['authors'] = self._get_element_text(properties, f'{ns_prefix}Authors')
                 affects_saves = self._get_element_text(properties, f'{ns_prefix}AffectsSavedGames')
