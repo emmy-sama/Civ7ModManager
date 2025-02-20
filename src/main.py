@@ -68,6 +68,13 @@ class Civ7ModManager(QMainWindow):
             header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # Allow user resizing
             header.setSectionsClickable(True)
             header.sectionClicked.connect(self._handle_sort)
+            # Set default column widths
+            header.resizeSection(0, 300)  # Name column
+            header.resizeSection(1, 200)  # Mod ID column
+            header.resizeSection(2, 100)  # Version column
+            header.resizeSection(3, 100)  # Affects Saves column
+            header.resizeSection(4, 100)  # Has Conflicts column
+            header.resizeSection(5, 150)  # Author column
         self.mod_tree.setAlternatingRowColors(True)
         self.mod_tree.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.mod_tree.customContextMenuRequested.connect(self._show_context_menu)
