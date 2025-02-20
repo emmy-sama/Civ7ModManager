@@ -27,8 +27,10 @@ class Civ7ModManager(QMainWindow):
         
         # Define paths
         local_appdata = os.getenv('LOCALAPPDATA')
-        if not local_appdata:
-            raise EnvironmentError("Unable to locate LOCALAPPDATA")
+        if not local_appdata:  # Early return with error if LOCALAPPDATA not found
+            error_msg = "Unable to locate LOCALAPPDATA environment variable"
+            QMessageBox.critical(self, "Error", error_msg)
+            raise EnvironmentError(error_msg)
 
         self.app_path = Path(__file__).parent
         self.game_mods_path = Path(local_appdata) / "Firaxis Games" / "Sid Meier's Civilization VII" / "Mods"
@@ -61,9 +63,11 @@ class Civ7ModManager(QMainWindow):
         self.mod_tree = QTreeWidget()
         headers = ["Name", "Mod ID", "Version", "Affects Saves", "Has Conflicts", "Author"]
         self.mod_tree.setHeaderLabels(headers)
-        self.mod_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # Allow user resizing
-        self.mod_tree.header().setSectionsClickable(True) # type: ignore
-        self.mod_tree.header().sectionClicked.connect(self._handle_sort) # type: ignore
+        header = self.mod_tree.header()
+        if header:  # Check if header exists before calling methods
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # Allow user resizing
+            header.setSectionsClickable(True)
+            header.sectionClicked.connect(self._handle_sort)
         self.mod_tree.setAlternatingRowColors(True)
         self.mod_tree.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.mod_tree.customContextMenuRequested.connect(self._show_context_menu)
@@ -150,6 +154,14 @@ class Civ7ModManager(QMainWindow):
 
     def _handle_sort(self, column):
         """Handle column header clicks for sorting"""
+        if not self.mod_tree:  # Early return if tree widget is not initialized
+            self.logger.warning("Cannot sort: mod tree is not initialized")
+            return
+            
+        if column < 0:  # Early return for invalid column index
+            self.logger.warning(f"Cannot sort: invalid column index {column}")
+            return
+            
         if self._current_sort_column == column:
             # Toggle sort order if clicking the same column
             self._current_sort_order = Qt.SortOrder.DescendingOrder if self._current_sort_order == Qt.SortOrder.AscendingOrder else Qt.SortOrder.AscendingOrder
@@ -167,31 +179,49 @@ class Civ7ModManager(QMainWindow):
 
     def _on_mod_toggle(self, item, column):
         """Handle mod enable/disable checkbox changes"""
-        if column == 0:  # Only handle changes in the Name column
-            is_enabled = item.checkState(0) == Qt.CheckState.Checked
-            folder_name = item.data(0, Qt.ItemDataRole.UserRole)  # Store folder_name in item data
+        if not item or column != 0:  # Early return if no item or wrong column
+            return
             
-            if folder_name in self.mods:
-                self.mods[folder_name].enabled = is_enabled
-                self._update_mod_count()
-                self._update_conflicts()
+        is_enabled = item.checkState(0) == Qt.CheckState.Checked
+        folder_name = item.data(0, Qt.ItemDataRole.UserRole)
+        if not folder_name:  # Early return if no folder name
+            return
+            
+        mod = self.mods.get(folder_name)
+        if not mod:  # Early return if mod not found
+            return
+            
+        mod.enabled = is_enabled
+        self._update_mod_count()
+        self._update_conflicts()
 
     def _update_conflicts(self):
         """Update the conflicts status for all mods"""
-        enabled_mods = {name: mod for name, mod in self.mods.items() if mod.enabled}
+        if not self.mod_tree:  # Early return if tree widget is not initialized
+            return
+
+        # Update enabled mods
+        enabled_mods = {name: mod for name, mod in self.mods.items() if mod and mod.enabled}
         
         # Clear all conflict statuses
         for i in range(self.mod_tree.topLevelItemCount()):
             item = self.mod_tree.topLevelItem(i)
+            if not item:  # Skip if item is None
+                continue
             item.setText(4, '')
             
         # Check for conflicts between enabled mods
         for i in range(self.mod_tree.topLevelItemCount()):
             item = self.mod_tree.topLevelItem(i)
+            if not item:  # Skip if item is None
+                continue
+                
             mod_name = item.text(0)
+            if not mod_name:  # Skip if no mod name
+                continue
+                
             mod = self.mods.get(mod_name)
-            
-            if not mod:
+            if not mod:  # Skip if mod not found
                 continue
                 
             has_conflicts = False
@@ -207,6 +237,12 @@ class Civ7ModManager(QMainWindow):
     def deploy_mods(self):
         """Deploy enabled mods to game directory"""
         try:
+            if not self.game_mods_path.exists():  # Early return if game mods path doesn't exist
+                error_msg = "Game mods directory does not exist"
+                self.logger.error(error_msg)
+                QMessageBox.critical(self, "Error", error_msg)
+                return
+                
             # Ask for confirmation
             reply = QMessageBox.question(
                 self,
@@ -262,23 +298,30 @@ class Civ7ModManager(QMainWindow):
     def refresh_mod_list(self):
         """Refresh the list of mods from storage directory"""
         self.logger.info("Refreshing mod list")
+        
         self.mod_tree.clear()
         self.mods.clear()
+        self._update_mod_count()
         
         if not self.storage_path.exists():
             self.logger.warning("Storage directory not found!")
-            self._update_mod_count()
             return
             
         try:
             # Count total mods first
             mod_dirs = [d for d in self.storage_path.iterdir() if d.is_dir()]
+            if not mod_dirs:  # Early return if no mod directories
+                self.logger.info("No mod directories found")
+                self.mod_tree.clear()
+                self.mods.clear()
+                self._update_mod_count()
+                return
+            
             total_mods = len(mod_dirs)
             
-            if total_mods > 0:
-                self.progress_bar.setMaximum(total_mods)
-                self.progress_bar.setValue(0)
-                self.progress_bar.show()
+            self.progress_bar.setMaximum(total_mods)
+            self.progress_bar.setValue(0)
+            self.progress_bar.show()
             
             # Sort mod directories by name
             mod_dirs.sort(key=lambda x: x.name.lower())
@@ -323,10 +366,22 @@ class Civ7ModManager(QMainWindow):
             return
             
         try:
+            if not Path(file_path).exists():
+                error_msg = f"Selected file does not exist: {file_path}"
+                self.logger.error(error_msg)
+                QMessageBox.critical(self, "Error", error_msg)
+                return
+                
             self.logger.info(f"Installing mod from: {file_path}")
             
             # Get archive type and check support
             archive_type = ArchiveHandler.get_archive_type(file_path)
+            if not archive_type:  # Early return if archive type can't be determined
+                error_msg = "Could not determine archive type"
+                self.logger.error(error_msg)
+                QMessageBox.critical(self, "Error", error_msg)
+                return
+                
             if not ArchiveHandler.is_format_supported(archive_type):
                 error_msg = f"Archive format '{archive_type}' is not supported.\n\n"
                 if archive_type == 'rar':
@@ -355,9 +410,6 @@ class Civ7ModManager(QMainWindow):
                 self.progress_bar.setValue(3)
                 
             except Exception as extract_error:
-                # If extraction fails, ensure cleanup of any partial files
-                if 'mod_name' in locals() and mod_name and (self.storage_path / mod_name).exists():
-                    shutil.rmtree(self.storage_path / mod_name)
                 raise extract_error
             
         except ValueError as ve:
@@ -379,11 +431,23 @@ class Civ7ModManager(QMainWindow):
             ""
         )
         
-        if not folder_path:
+        if not folder_path:  # Early return if no folder selected
             return
             
         try:
             folder_path = Path(folder_path)
+            if not folder_path.exists():  # Early return if folder doesn't exist
+                error_msg = f"Selected folder does not exist: {folder_path}"
+                self.logger.error(error_msg)
+                QMessageBox.critical(self, "Error", error_msg)
+                return
+                
+            if not folder_path.is_dir():  # Early return if not a directory
+                error_msg = f"Selected path is not a directory: {folder_path}"
+                self.logger.error(error_msg)
+                QMessageBox.critical(self, "Error", error_msg)
+                return
+                
             self.logger.info(f"Installing mods from folder: {folder_path}")
             
             # Find all mod archives in the folder
@@ -391,7 +455,7 @@ class Civ7ModManager(QMainWindow):
             for ext in ['.zip', '.7z', '.rar', '.r00']:
                 mod_files.extend(folder_path.glob(f'*{ext}'))
             
-            if not mod_files:
+            if not mod_files:  # Early return if no mod files found
                 QMessageBox.information(self, "No Mods Found", "No mod archives found in the selected folder.")
                 return
             
@@ -404,7 +468,7 @@ class Civ7ModManager(QMainWindow):
             failed_installs = []
             
             for i, file_path in enumerate(sorted(mod_files)):
-                mod_name = None  # Initialize mod_name for each iteration
+                mod_name = None  # Initialize mod_name first
                 try:
                     self.logger.info(f"Installing mod from: {file_path}")
                     
@@ -452,26 +516,33 @@ class Civ7ModManager(QMainWindow):
     def save_profile(self):
         """Save current mod configuration as a profile"""
         name, ok = QInputDialog.getText(self, "Save Profile", "Enter profile name:")
-        if ok and name:
-            try:
-                self.logger.info(f"Saving profile: {name}")
-                # Get current mod states using folder_name as key
-                profile_data = {
-                    folder_name: mod.enabled
-                    for folder_name, mod in self.mods.items()
-                }
+        if not ok or not name:  # Early return if cancelled or empty name
+            return
+            
+        try:
+            self.logger.info(f"Saving profile: {name}")
+            if not self.mods:  # Early return if no mods to save
+                self.logger.warning("No mods to save in profile")
+                QMessageBox.warning(self, "Warning", "No mods available to save in profile.")
+                return
                 
-                profile_path = self.profiles_path / f"{name}.json"
-                with open(profile_path, 'w') as f:
-                    json.dump(profile_data, f, indent=2)
-                    
-                success_msg = f"Profile '{name}' saved successfully!"
-                self.logger.info(success_msg)
-                QMessageBox.information(self, "Success", success_msg)
-            except Exception as e:
-                error_msg = f"Failed to save profile: {str(e)}"
-                self.logger.error(error_msg)
-                QMessageBox.critical(self, "Error", error_msg)
+            # Get current mod states using folder_name as key
+            profile_data = {
+                folder_name: mod.enabled
+                for folder_name, mod in self.mods.items()
+            }
+            
+            profile_path = self.profiles_path / f"{name}.json"
+            with open(profile_path, 'w') as f:
+                json.dump(profile_data, f, indent=2)
+                
+            success_msg = f"Profile '{name}' saved successfully!"
+            self.logger.info(success_msg)
+            QMessageBox.information(self, "Success", success_msg)
+        except Exception as e:
+            error_msg = f"Failed to save profile: {str(e)}"
+            self.logger.error(error_msg)
+            QMessageBox.critical(self, "Error", error_msg)
 
     def load_profile(self):
         """Load a saved mod profile"""
@@ -481,9 +552,6 @@ class Civ7ModManager(QMainWindow):
             QMessageBox.information(self, "No Profiles", "No saved profiles found.")
             return
             
-        # Sort profiles alphabetically
-        profiles.sort(key=str.lower)
-            
         name, ok = QInputDialog.getItem(
             self,
             "Load Profile",
@@ -492,38 +560,59 @@ class Civ7ModManager(QMainWindow):
             editable=False
         )
         
-        if ok and name:
-            try:
-                self.logger.info(f"Loading profile: {name}")
-                # Load profile data
-                profile_path = self.profiles_path / f"{name}.json"
-                with open(profile_path, 'r') as f:
-                    profile_data = json.load(f)
-                
-                # Update tree items and mod states
-                root = self.mod_tree.invisibleRootItem()
-                for i in range(root.childCount()):
-                    item = root.child(i)
-                    folder_name = item.data(0, Qt.ItemDataRole.UserRole)
-                    if folder_name in profile_data:
-                        should_be_enabled = profile_data[folder_name]
-                        item.setCheckState(0, Qt.CheckState.Checked if should_be_enabled else Qt.CheckState.Unchecked)
-                        self.mods[folder_name].enabled = should_be_enabled
-                
-                # Update conflict status after loading profile
-                self._update_conflicts()
-                self._update_mod_count()
-                
-                success_msg = f"Profile '{name}' loaded successfully!"
-                self.logger.info(success_msg)
-                QMessageBox.information(self, "Success", success_msg)
-            except Exception as e:
-                error_msg = f"Failed to load profile: {str(e)}"
+        if not ok or not name:  # Early return if no selection
+            return
+            
+        try:
+            self.logger.info(f"Loading profile: {name}")
+            profile_path = self.profiles_path / f"{name}.json"
+            if not profile_path.exists():  # Early return if profile file missing
+                error_msg = f"Profile file not found: {profile_path}"
                 self.logger.error(error_msg)
                 QMessageBox.critical(self, "Error", error_msg)
+                return
+                
+            with open(profile_path, 'r') as f:
+                profile_data = json.load(f)
+            
+            # Update tree items and mod states
+            root = self.mod_tree.invisibleRootItem()
+            if not root:  # Check if root exists
+                return
+                
+            for i in range(root.childCount()):
+                item = root.child(i)
+                if not item:  # Skip if item is None
+                    continue
+                    
+                folder_name = item.data(0, Qt.ItemDataRole.UserRole)
+                if folder_name in profile_data:
+                    should_be_enabled = profile_data[folder_name]
+                    item.setCheckState(0, Qt.CheckState.Checked if should_be_enabled else Qt.CheckState.Unchecked)
+                    if folder_name in self.mods:
+                        self.mods[folder_name].enabled = should_be_enabled
+                
+            # Update conflict status after loading profile
+            self._update_conflicts()
+            self._update_mod_count()
+                
+            success_msg = f"Profile '{name}' loaded successfully!"
+            self.logger.info(success_msg)
+            QMessageBox.information(self, "Success", success_msg)
+        except Exception as e:
+            error_msg = f"Failed to load profile: {str(e)}"
+            self.logger.error(error_msg)
+            QMessageBox.critical(self, "Error", error_msg)
 
     def _show_context_menu(self, position):
         """Show context menu for mod tree items"""
+        if not position or not self.mod_tree:  # Early return if no position or tree
+            return
+            
+        viewport = self.mod_tree.viewport()
+        if not viewport:  # Check viewport exists
+            return
+            
         item = self.mod_tree.itemAt(position)
         if not item:
             return
@@ -534,9 +623,14 @@ class Civ7ModManager(QMainWindow):
         goto_location_action = menu.addAction("Go to Mod Location")  # Add new action
         uninstall_action = menu.addAction("Uninstall")
         
-        action = menu.exec(self.mod_tree.viewport().mapToGlobal(position))
-        
+        action = menu.exec(viewport.mapToGlobal(position))
+        if not action:  # Early return if no action selected
+            return
+            
         folder_name = item.data(0, Qt.ItemDataRole.UserRole)
+        if not folder_name:  # Early return if no folder name
+            return
+            
         if action == view_info_action:
             self._show_mod_info(folder_name)
         elif action == view_conflicts_action:
@@ -548,12 +642,15 @@ class Civ7ModManager(QMainWindow):
 
     def _goto_mod_location(self, folder_name):
         """Open the mod's folder in File Explorer"""
-        mod = self.mods.get(folder_name)
-        if not mod:
+        if not folder_name:  # Early return if no folder name
             return
-        
+            
+        mod = self.mods.get(folder_name)
+        if not mod:  # Early return if mod not found
+            return
+            
         try:
-            os.startfile(str(mod.path))  # Windows-specific command to open folder
+            os.startfile(str(mod.path))
             self.logger.info(f"Opened mod location: {mod.path}")
         except Exception as e:
             error_msg = f"Failed to open mod location: {str(e)}"
@@ -562,8 +659,11 @@ class Civ7ModManager(QMainWindow):
 
     def _show_mod_info(self, folder_name):
         """Display mod information"""
+        if not folder_name:  # Early return if no folder name
+            return
+            
         mod = self.mods.get(folder_name)
-        if not mod:
+        if not mod:  # Early return if mod not found
             return
             
         # Create a formatted text layout with sections
@@ -610,14 +710,23 @@ class Civ7ModManager(QMainWindow):
 
     def _check_conflicts(self, folder_name):
         """Check for conflicts with other enabled mods"""
+        if not folder_name:  # Early return if no folder name provided
+            return
+            
         mod = self.mods.get(folder_name)
-        if not mod:
+        if not mod or not mod.enabled:  # Early return if mod not found or not enabled
             return
             
         conflicts = []
         for other_folder, other_mod in self.mods.items():
+            if not other_mod:  # Skip if other mod is invalid
+                continue
+                
             if other_folder != folder_name and other_mod.enabled:
                 # Check for overlapping affected files
+                if not other_mod.metadata or not mod.metadata:  # Skip if metadata is missing
+                    continue
+                    
                 common_files = mod.metadata['affected_files'] & other_mod.metadata['affected_files']
                 if common_files:
                     conflicts.append(f"{other_mod.metadata['display_name']}:\n" + "\n".join(f"  - {file}" for file in sorted(common_files)))

@@ -15,7 +15,7 @@ class ArchiveHandler:
     def is_format_supported(archive_type):
         """Check if a specific archive format is supported"""
         if archive_type == 'zip':
-            return True  # zip support is built into Python
+            return True
         elif archive_type == '7z':
             try:
                 import py7zr
@@ -42,7 +42,7 @@ class ArchiveHandler:
             raise ValueError(f"Unsupported archive format: {ext}")
 
     @classmethod
-    def extract_mod_folder(cls, file_path, target_path, mod_folder=None):
+    def extract_mod_folder(cls, file_path, target_path):
         """Extract the archive and move/rename the mod folder appropriately"""
         archive_type = cls.get_archive_type(file_path)
         file_path = Path(file_path)
