@@ -61,7 +61,7 @@ class Civ7ModManager(QMainWindow):
         self.mod_tree = QTreeWidget()
         headers = ["Name", "Mod ID", "Version", "Affects Saves", "Has Conflicts", "Author"]
         self.mod_tree.setHeaderLabels(headers)
-        self.mod_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents) # type: ignore
+        self.mod_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # Allow user resizing
         self.mod_tree.header().setSectionsClickable(True) # type: ignore
         self.mod_tree.header().sectionClicked.connect(self._handle_sort) # type: ignore
         self.mod_tree.setAlternatingRowColors(True)
@@ -531,6 +531,7 @@ class Civ7ModManager(QMainWindow):
         menu = QMenu()
         view_info_action = menu.addAction("View Mod Info")
         view_conflicts_action = menu.addAction("Check Conflicts")
+        goto_location_action = menu.addAction("Go to Mod Location")  # Add new action
         uninstall_action = menu.addAction("Uninstall")
         
         action = menu.exec(self.mod_tree.viewport().mapToGlobal(position))
@@ -540,8 +541,24 @@ class Civ7ModManager(QMainWindow):
             self._show_mod_info(folder_name)
         elif action == view_conflicts_action:
             self._check_conflicts(folder_name)
+        elif action == goto_location_action:  # Handle new action
+            self._goto_mod_location(folder_name)
         elif action == uninstall_action:
             self._uninstall_mod(folder_name)
+
+    def _goto_mod_location(self, folder_name):
+        """Open the mod's folder in File Explorer"""
+        mod = self.mods.get(folder_name)
+        if not mod:
+            return
+        
+        try:
+            os.startfile(str(mod.path))  # Windows-specific command to open folder
+            self.logger.info(f"Opened mod location: {mod.path}")
+        except Exception as e:
+            error_msg = f"Failed to open mod location: {str(e)}"
+            self.logger.error(error_msg)
+            QMessageBox.critical(self, "Error", error_msg)
 
     def _show_mod_info(self, folder_name):
         """Display mod information"""
@@ -549,27 +566,47 @@ class Civ7ModManager(QMainWindow):
         if not mod:
             return
             
-        info_text = f"Mod Name: {mod.metadata['display_name']}\n"
-        info_text += f"Folder: {folder_name}\n"
-        info_text += f"ID: {mod.metadata['id']}\n"
-        info_text += f"Version: {mod.metadata['version']}\n"
-        info_text += f"Authors: {mod.metadata['authors']}\n"
-        info_text += f"Status: {'Enabled' if mod.enabled else 'Disabled'}\n"
-        info_text += f"Location: {mod.path}\n"
-        info_text += f"Affects Saved Games: {'Yes' if mod.metadata['affects_saves'] else 'No'}\n\n"
+        # Create a formatted text layout with sections
+        sections = []
         
+        # Basic Info Section
+        basic_info = [
+            ("Mod Name", mod.metadata['display_name']),
+            ("Folder", folder_name),
+            ("ID", mod.metadata['id']),
+            ("Version", mod.metadata['version']),
+            ("Authors", mod.metadata['authors']),
+            ("Status", 'Enabled' if mod.enabled else 'Disabled'),
+            ("Location", str(mod.path)),
+            ("Affects Saved Games", 'Yes' if mod.metadata['affects_saves'] else 'No')
+        ]
+        
+        sections.append("Basic Information\n" + "-" * 50 + "\n" + 
+                      "\n".join(f"{key}: {value}" for key, value in basic_info))
+        
+        # Dependencies Section
         if mod.metadata['dependencies']:
-            info_text += "Dependencies:\n"
+            dep_text = "\n\nDependencies\n" + "-" * 50 + "\n"
             for dep in mod.metadata['dependencies']:
-                info_text += f"- {dep['title']} ({dep['id']})\n"
-            info_text += "\n"
+                dep_text += f"• {dep['title']} ({dep['id']})\n"
+            sections.append(dep_text)
         
+        # Affected Files Section
         if mod.metadata['affected_files']:
-            info_text += "Affected Files:\n"
+            files_text = "\nAffected Files\n" + "-" * 50 + "\n"
             for file in sorted(mod.metadata['affected_files']):
-                info_text += f"- {file}\n"
+                files_text += f"• {file}\n"
+            sections.append(files_text)
         
-        QMessageBox.information(self, f"Mod Information - {mod.metadata['display_name']}", info_text)
+        # Show the info in a larger message box
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle(f"Mod Information - {mod.metadata['display_name']}")
+        msg_box.setText("".join(sections))
+        msg_box.setTextFormat(Qt.TextFormat.PlainText)
+        
+        # Make the message box wider and taller
+        msg_box.setStyleSheet("QLabel{min-width: 600px; min-height: 400px;}")
+        msg_box.exec()
 
     def _check_conflicts(self, folder_name):
         """Check for conflicts with other enabled mods"""
