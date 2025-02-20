@@ -1,22 +1,23 @@
 from dataclasses import dataclass
 from pathlib import Path
 import xml.etree.ElementTree as ET
+from typing import List, Dict, Set
 
 @dataclass
 class ModInfo:
     def __init__(self, mod_path):
         self.path = Path(mod_path)
-        self.name = self.path.name
+        self.folder_name = self.path.name  # The folder name is our stable identifier
         self.enabled = False
-        self.metadata = {
+        self.metadata: Dict = {
             'id': '',
             'version': '',
-            'name': '',
+            'display_name': '',  # Changed from 'name' to be more explicit
             'description': '',
             'authors': '',
             'affects_saves': False,
-            'dependencies': [],
-            'affected_files': set()
+            'dependencies': [],  # List of dependency dicts
+            'affected_files': set()  # Set of file paths
         }
         self._load_metadata()
 
@@ -25,54 +26,66 @@ class ModInfo:
         # Look for .modinfo file in the mod directory
         modinfo_files = list(self.path.glob("*.modinfo"))
         if not modinfo_files:
-            print(f"No .modinfo file found for {self.name}")
+            print(f"No .modinfo file found for {self.folder_name}")
             return
 
         try:
             tree = ET.parse(modinfo_files[0])
             root = tree.getroot()
             
+            # Handle XML namespace
+            ns = {'': root.tag.split('}')[0].strip('{')} if '}' in root.tag else ''
+            if ns:
+                ns_prefix = '{' + ns[''] + '}'
+            else:
+                ns_prefix = ''
+            
             # Get basic mod info
             self.metadata['id'] = root.get('id', '')
             self.metadata['version'] = root.get('version', '')
             
             # Get properties
-            properties = root.find('.//Properties')
+            properties = root.find(f'.//{ns_prefix}Properties')
             if properties is not None:
-                self.metadata['name'] = self._get_element_text(properties, 'Name')
-                print(self.metadata['name'])
-                self.name = self.metadata['name']  # Use mod name from .modinfo
-                self.metadata['description'] = self._get_element_text(properties, 'Description')
-                self.metadata['authors'] = self._get_element_text(properties, 'Authors')
-                affects_saves = self._get_element_text(properties, 'AffectsSavedGames')
+                self.metadata['display_name'] = self._get_element_text(properties, f'{ns_prefix}Name') or self.folder_name
+                self.metadata['description'] = self._get_element_text(properties, f'{ns_prefix}Description')
+                self.metadata['authors'] = self._get_element_text(properties, f'{ns_prefix}Authors')
+                affects_saves = self._get_element_text(properties, f'{ns_prefix}AffectsSavedGames')
                 self.metadata['affects_saves'] = affects_saves == '1' if affects_saves else False
             
+            # If no display name was found in metadata, use folder name
+            if not self.metadata['display_name']:
+                self.metadata['display_name'] = self.folder_name
+
             # Get dependencies
-            dependencies = root.find('.//Dependencies')
+            dependencies = root.find(f'.//{ns_prefix}Dependencies')
             if dependencies is not None:
-                for dep in dependencies.findall('Mod'):
+                for dep in dependencies.findall(f'.//{ns_prefix}Mod'):
                     self.metadata['dependencies'].append({
                         'id': dep.get('id', ''),
                         'title': dep.get('title', '')
                     })
             
-            # Get affected files
-            for action_group in root.findall('.//ActionGroup'):
-                for action in action_group.findall('.//Actions'):
-                    # UI Scripts
-                    for script in action.findall('.//UIScripts/Item'):
-                        if script.text:
-                            self.metadata['affected_files'].add(script.text)
+            # Get affected files from all action groups
+            for action_group in root.findall(f'.//{ns_prefix}ActionGroup'):
+                actions = action_group.find(f'.//{ns_prefix}Actions')
+                if actions is not None:
+                    # Process UpdateDatabase actions
+                    for update_db in actions.findall(f'.//{ns_prefix}UpdateDatabase'):
+                        for item in update_db.findall(f'.//{ns_prefix}Item'):
+                            if item.text:
+                                self.metadata['affected_files'].add(item.text.strip())
                     
-                    # Localization files
-                    for text_file in action.findall('.//LocalizedText/File'):
-                        if text_file.text:
-                            self.metadata['affected_files'].add(text_file.text)
+                    # Process UpdateText actions
+                    for update_text in actions.findall(f'.//{ns_prefix}UpdateText'):
+                        for item in update_text.findall(f'.//{ns_prefix}Item'):
+                            if item.text:
+                                self.metadata['affected_files'].add(item.text.strip())
 
         except Exception as e:
-            print(f"Error loading metadata for {self.name}: {e}")
+            print(f"Error loading metadata for {self.folder_name}: {e}")
 
     def _get_element_text(self, parent, tag):
         """Helper method to safely get element text"""
-        element = parent.find(tag)
-        return element.text if element is not None else ''
+        element = parent.find(f'.//{tag}')
+        return element.text.strip() if element is not None and element.text else ''

@@ -167,10 +167,10 @@ class Civ7ModManager(QMainWindow):
         """Handle mod enable/disable checkbox changes"""
         if column == 0:  # Only handle changes in the Name column
             is_enabled = item.checkState(0) == Qt.CheckState.Checked
-            mod_name = item.text(0)
+            folder_name = item.data(0, Qt.ItemDataRole.UserRole)  # Store folder_name in item data
             
-            if mod_name in self.mods:
-                self.mods[mod_name].enabled = is_enabled
+            if folder_name in self.mods:
+                self.mods[folder_name].enabled = is_enabled
                 self._update_mod_count()
                 self._update_conflicts()
 
@@ -284,12 +284,13 @@ class Civ7ModManager(QMainWindow):
             for i, mod_item in enumerate(mod_dirs):
                 try:
                     mod_info = ModInfo(mod_item)
-                    self.mods[mod_item.name] = mod_info
+                    self.mods[mod_info.folder_name] = mod_info
                     
                     tree_item = ModTreeItem(mod_info)
+                    tree_item.setData(0, Qt.ItemDataRole.UserRole, mod_info.folder_name)  # Store folder_name for reference
                     self.mod_tree.addTopLevelItem(tree_item)
                     
-                    self.logger.info(f"Loaded mod: {mod_item.name}")
+                    self.logger.info(f"Loaded mod: {mod_info.folder_name}")
                     self.progress_bar.setValue(i + 1)
                 except Exception as mod_error:
                     self.logger.error(f"Error loading mod {mod_item.name}: {str(mod_error)}")
@@ -374,10 +375,10 @@ class Civ7ModManager(QMainWindow):
         if ok and name:
             try:
                 self.logger.info(f"Saving profile: {name}")
-                # Get current mod states
+                # Get current mod states using folder_name as key
                 profile_data = {
-                    mod_name: mod.enabled
-                    for mod_name, mod in self.mods.items()
+                    folder_name: mod.enabled
+                    for folder_name, mod in self.mods.items()
                 }
                 
                 profile_path = self.profiles_path / f"{name}.json"
@@ -423,11 +424,11 @@ class Civ7ModManager(QMainWindow):
                 root = self.mod_tree.invisibleRootItem()
                 for i in range(root.childCount()):
                     item = root.child(i)
-                    mod_name = item.text(0)
-                    if mod_name in profile_data:
-                        should_be_enabled = profile_data[mod_name]
+                    folder_name = item.data(0, Qt.ItemDataRole.UserRole)
+                    if folder_name in profile_data:
+                        should_be_enabled = profile_data[folder_name]
                         item.setCheckState(0, Qt.CheckState.Checked if should_be_enabled else Qt.CheckState.Unchecked)
-                        self.mods[mod_name].enabled = should_be_enabled
+                        self.mods[folder_name].enabled = should_be_enabled
                 
                 # Update conflict status after loading profile
                 self._update_conflicts()
@@ -454,21 +455,22 @@ class Civ7ModManager(QMainWindow):
         
         action = menu.exec(self.mod_tree.viewport().mapToGlobal(position))
         
-        mod_name = item.text(0)
+        folder_name = item.data(0, Qt.ItemDataRole.UserRole)
         if action == view_info_action:
-            self._show_mod_info(mod_name)
+            self._show_mod_info(folder_name)
         elif action == view_conflicts_action:
-            self._check_conflicts(mod_name)
+            self._check_conflicts(folder_name)
         elif action == uninstall_action:
-            self._uninstall_mod(mod_name)
+            self._uninstall_mod(folder_name)
 
-    def _show_mod_info(self, mod_name):
+    def _show_mod_info(self, folder_name):
         """Display mod information"""
-        mod = self.mods.get(mod_name)
+        mod = self.mods.get(folder_name)
         if not mod:
             return
             
-        info_text = f"Mod Name: {mod.metadata['name'] or mod_name}\n"
+        info_text = f"Mod Name: {mod.metadata['display_name']}\n"
+        info_text += f"Folder: {folder_name}\n"
         info_text += f"ID: {mod.metadata['id']}\n"
         info_text += f"Version: {mod.metadata['version']}\n"
         info_text += f"Authors: {mod.metadata['authors']}\n"
@@ -487,54 +489,54 @@ class Civ7ModManager(QMainWindow):
             for file in sorted(mod.metadata['affected_files']):
                 info_text += f"- {file}\n"
         
-        QMessageBox.information(self, f"Mod Information - {mod_name}", info_text)
+        QMessageBox.information(self, f"Mod Information - {mod.metadata['display_name']}", info_text)
 
-    def _check_conflicts(self, mod_name):
+    def _check_conflicts(self, folder_name):
         """Check for conflicts with other enabled mods"""
-        mod = self.mods.get(mod_name)
+        mod = self.mods.get(folder_name)
         if not mod:
             return
             
         conflicts = []
-        for other_name, other_mod in self.mods.items():
-            if other_name != mod_name and other_mod.enabled:
+        for other_folder, other_mod in self.mods.items():
+            if other_folder != folder_name and other_mod.enabled:
                 # Check for overlapping affected files
                 common_files = mod.metadata['affected_files'] & other_mod.metadata['affected_files']
                 if common_files:
-                    conflicts.append(f"{other_name}:\n" + "\n".join(f"  - {file}" for file in sorted(common_files)))
+                    conflicts.append(f"{other_mod.metadata['display_name']}:\n" + "\n".join(f"  - {file}" for file in sorted(common_files)))
         
         if conflicts:
             QMessageBox.warning(
                 self,
                 "Mod Conflicts",
-                f"Conflicts found for {mod_name} with enabled mods:\n\n" + "\n".join(conflicts)
+                f"Conflicts found for {mod.metadata['display_name']} with enabled mods:\n\n" + "\n".join(conflicts)
             )
         else:
             QMessageBox.information(
                 self,
                 "Mod Conflicts",
-                f"No conflicts found for {mod_name} with enabled mods"
+                f"No conflicts found for {mod.metadata['display_name']} with enabled mods"
             )
 
-    def _uninstall_mod(self, mod_name):
+    def _uninstall_mod(self, folder_name):
         """Uninstall a mod by removing it from storage"""
+        mod = self.mods.get(folder_name)
+        if not mod:
+            return
+            
         reply = QMessageBox.question(
             self,
             "Confirm Uninstall",
-            f"Are you sure you want to uninstall '{mod_name}'?",
+            f"Are you sure you want to uninstall '{mod.metadata['display_name']}'?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            mod = self.mods.get(mod_name)
-            if not mod:
-                return
-                
             try:
-                self.logger.info(f"Uninstalling mod: {mod_name}")
+                self.logger.info(f"Uninstalling mod: {folder_name}")
                 # Remove from storage
                 shutil.rmtree(mod.path)
-                success_msg = f"Mod '{mod_name}' uninstalled successfully!"
+                success_msg = f"Mod '{mod.metadata['display_name']}' uninstalled successfully!"
                 self.logger.info(success_msg)
                 QMessageBox.information(self, "Success", success_msg)
                 self.refresh_mod_list()

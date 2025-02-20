@@ -3,7 +3,6 @@ from pathlib import Path
 import zipfile
 import py7zr
 import shutil
-import re
 
 class ArchiveError(Exception):
     """Base exception for archive operations"""
