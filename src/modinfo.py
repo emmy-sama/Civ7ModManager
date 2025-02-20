@@ -7,17 +7,17 @@ from typing import List, Dict, Set
 class ModInfo:
     def __init__(self, mod_path):
         self.path = Path(mod_path)
-        self.folder_name = self.path.name  # The folder name is our stable identifier
+        self.folder_name = self.path.name
         self.enabled = False
+        self.conflicts: Dict[str, List[str]] = {}
         self.metadata: Dict = {
             'id': '',
             'version': '',
-            'display_name': '',  # Changed from 'name' to be more explicit
-            'description': '',
+            'display_name': '',
             'authors': '',
             'affects_saves': False,
-            'dependencies': [],  # List of dependency dicts
-            'affected_files': set()  # Set of file paths
+            'dependencies': [],
+            'affected_files': set()
         }
         self._load_metadata()
 
@@ -103,6 +103,7 @@ class ModInfo:
             for action_group in root.findall(f'.//{ns_prefix}ActionGroup'):
                 actions = action_group.find(f'.//{ns_prefix}Actions')
                 if actions is not None:
+                    """ Not sure if we need to check update database and update text actions
                     # Process UpdateDatabase actions
                     for update_db in actions.findall(f'.//{ns_prefix}UpdateDatabase'):
                         for item in update_db.findall(f'.//{ns_prefix}Item'):
@@ -112,6 +113,18 @@ class ModInfo:
                     # Process UpdateText actions
                     for update_text in actions.findall(f'.//{ns_prefix}UpdateText'):
                         for item in update_text.findall(f'.//{ns_prefix}Item'):
+                            if item.text:
+                                self.metadata['affected_files'].add(item.text.strip())
+                    """
+                    # Process UIScripts actions
+                    for ui_scripts in actions.findall(f'.//{ns_prefix}UIScripts'):
+                        for item in ui_scripts.findall(f'.//{ns_prefix}Item'):
+                            if item.text:
+                                self.metadata['affected_files'].add(item.text.strip())
+                                
+                    # Process ImportFiles actions
+                    for import_files in actions.findall(f'.//{ns_prefix}ImportFiles'):
+                        for item in import_files.findall(f'.//{ns_prefix}Item'):
                             if item.text:
                                 self.metadata['affected_files'].add(item.text.strip())
 

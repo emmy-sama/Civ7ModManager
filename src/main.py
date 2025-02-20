@@ -111,6 +111,8 @@ class Civ7ModManager(QMainWindow):
         install_folder_button = QPushButton("Install Folder")  # New button
         save_profile_button = QPushButton("Save Profile")
         load_profile_button = QPushButton("Load Profile")
+        enable_all_button = QPushButton("Enable All")  # New button
+        disable_all_button = QPushButton("Disable All")  # New button
         deploy_button = QPushButton("Deploy Mods")
         deploy_button.setStyleSheet("background-color: #4CAF50; color: white;")
         clear_log_button = QPushButton("Clear Log")
@@ -121,12 +123,15 @@ class Civ7ModManager(QMainWindow):
         install_folder_button.clicked.connect(self.install_mod_folder)  # New connection
         save_profile_button.clicked.connect(self.save_profile)
         load_profile_button.clicked.connect(self.load_profile)
+        enable_all_button.clicked.connect(self.enable_all_mods)  # New connection
+        disable_all_button.clicked.connect(self.disable_all_mods)  # New connection
         deploy_button.clicked.connect(self.deploy_mods)
         clear_log_button.clicked.connect(self.log_viewer.clear)
         
         # Add buttons to layout
         for button in [refresh_button, install_button, install_folder_button, save_profile_button, 
-                      load_profile_button, deploy_button, clear_log_button]:
+                      load_profile_button, enable_all_button, disable_all_button,  # Add new buttons
+                      deploy_button, clear_log_button]:
             button_layout.addWidget(button)
         
         layout.addLayout(button_layout)
@@ -204,43 +209,29 @@ class Civ7ModManager(QMainWindow):
 
     def _update_conflicts(self):
         """Update the conflicts status for all mods"""
-        if not self.mod_tree:  # Early return if tree widget is not initialized
-            return
-
         # Update enabled mods
-        enabled_mods = {name: mod for name, mod in self.mods.items() if mod and mod.enabled}
-        
-        # Clear all conflict statuses
-        for i in range(self.mod_tree.topLevelItemCount()):
-            item = self.mod_tree.topLevelItem(i)
-            if not item:  # Skip if item is None
-                continue
-            item.setText(4, '')
+        enabled_mods = {name: mod for name, mod in self.mods.items() if mod.enabled}
             
         # Check for conflicts between enabled mods
-        for i in range(self.mod_tree.topLevelItemCount()):
-            item = self.mod_tree.topLevelItem(i)
-            if not item:  # Skip if item is None
-                continue
-                
-            mod_name = item.text(0)
-            if not mod_name:  # Skip if no mod name
-                continue
-                
-            mod = self.mods.get(mod_name)
-            if not mod:  # Skip if mod not found
-                continue
-                
-            has_conflicts = False
+        for mod_name, mod in self.mods.items():
+            mod.conflicts.clear()
             if mod.enabled:
                 for other_name, other_mod in enabled_mods.items():
                     if other_name != mod_name:
-                        if mod.metadata['affected_files'] & other_mod.metadata['affected_files']:
-                            has_conflicts = True
-                            break
-            
-            item.setText(4, 'Yes' if has_conflicts else 'No')
-
+                        common_files = mod.metadata['affected_files'] & other_mod.metadata['affected_files']
+                        for file in common_files:
+                            mod.conflicts[other_mod.metadata['display_name']] = file
+        
+        # Update tree items with conflict status
+        for mod_name, mod in self.mods.items():
+            item = self.mod_tree.findItems(mod.metadata['display_name'], Qt.MatchFlag.MatchExactly, 0)[0]
+            if mod.enabled and mod.conflicts:
+                item.setText(4, "Yes")
+                item.setForeground(4, Qt.GlobalColor.red)
+            else:
+                item.setText(4, "No")
+                item.setForeground(4, Qt.GlobalColor.white)
+                
     def deploy_mods(self):
         """Deploy enabled mods to game directory"""
         try:
@@ -302,6 +293,34 @@ class Civ7ModManager(QMainWindow):
         finally:
             self.progress_bar.hide()
 
+    def enable_all_mods(self):
+        """Enable all mods in the list"""
+        root = self.mod_tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            item = root.child(i)
+            if item:
+                folder_name = item.data(0, Qt.ItemDataRole.UserRole)
+                if folder_name in self.mods:
+                    item.setCheckState(0, Qt.CheckState.Checked)
+                    self.mods[folder_name].enabled = True
+        self._update_mod_count()
+        self._update_conflicts()
+        self.logger.info("All mods enabled")
+
+    def disable_all_mods(self):
+        """Disable all mods in the list"""
+        root = self.mod_tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            item = root.child(i)
+            if item:
+                folder_name = item.data(0, Qt.ItemDataRole.UserRole)
+                if folder_name in self.mods:
+                    item.setCheckState(0, Qt.CheckState.Unchecked)
+                    self.mods[folder_name].enabled = False
+        self._update_mod_count()
+        self._update_conflicts()
+        self.logger.info("All mods disabled")
+
     def refresh_mod_list(self):
         """Refresh the list of mods from storage directory"""
         self.logger.info("Refreshing mod list")
@@ -346,13 +365,10 @@ class Civ7ModManager(QMainWindow):
                     self.progress_bar.setValue(i + 1)
                 except Exception as mod_error:
                     self.logger.error(f"Error loading mod {mod_item.name}: {str(mod_error)}")
-                    
-            # Update conflicts after all mods are loaded
-            self._update_conflicts()
             
             # Sort by current sort column and order
             self.mod_tree.sortItems(self._current_sort_column, self._current_sort_order)
-                    
+            
         except Exception as e:
             error_msg = f"Error reading mods: {str(e)}"
             self.logger.error(error_msg)
@@ -717,21 +733,24 @@ class Civ7ModManager(QMainWindow):
 
     def _check_conflicts(self, folder_name):
         """Check for conflicts with other enabled mods"""
-        if not folder_name:  # Early return if no folder name provided
-            return
-            
         mod = self.mods.get(folder_name)
-        if not mod or not mod.enabled:  # Early return if mod not found or not enabled
+        if not mod:
+            self.logger.warning(f"Mod not found: {folder_name}")
+            return
+        
+        if not mod.metadata['affected_files']:
+            QMessageBox.warning(
+                self,
+                "Mod Conflicts",
+                f"{mod.metadata['display_name']} has no affected files listed or metadata is missing"
+            )
             return
             
         conflicts = []
         for other_folder, other_mod in self.mods.items():
-            if not other_mod:  # Skip if other mod is invalid
-                continue
-                
-            if other_folder != folder_name and other_mod.enabled:
+            if other_folder != folder_name:
                 # Check for overlapping affected files
-                if not other_mod.metadata or not mod.metadata:  # Skip if metadata is missing
+                if not other_mod.metadata['affected_files']:  
                     continue
                     
                 common_files = mod.metadata['affected_files'] & other_mod.metadata['affected_files']
