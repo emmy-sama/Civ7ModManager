@@ -77,10 +77,8 @@ class ModInfo:
                         localized_name = self._get_localized_name(direct_name)
                         if localized_name:
                             self.metadata['display_name'] = localized_name
-                        else:
-                            self.metadata['display_name'] = direct_name or self.folder_name
                     else:
-                        self.metadata['display_name'] = direct_name or self.folder_name
+                        self.metadata['display_name'] = direct_name 
                 
                 self.metadata['description'] = self._get_element_text(properties, f'{ns_prefix}Description')
                 self.metadata['authors'] = self._get_element_text(properties, f'{ns_prefix}Authors')
@@ -88,7 +86,7 @@ class ModInfo:
                 self.metadata['affects_saves'] = affects_saves == '1' if affects_saves else False
             
             # If no display name was found in metadata, use folder name
-            if not self.metadata['display_name']:
+            if not self.metadata['display_name'] or self.metadata['display_name'] == '':
                 self.metadata['display_name'] = self.folder_name
 
             # Get dependencies
