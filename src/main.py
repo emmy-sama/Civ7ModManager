@@ -255,11 +255,6 @@ class Civ7ModManager(QMainWindow):
             enabled_mods = [(name, mod) for name, mod in self.mods.items() if mod.enabled]
             total_mods = len(enabled_mods)
             
-            if total_mods == 0:
-                self.logger.info("No mods are enabled for deployment")
-                QMessageBox.information(self, "Deploy Complete", "No mods are enabled.")
-                return
-            
             self.logger.info(f"Starting deployment of {total_mods} mods")
             self.progress_bar.setMaximum(total_mods + 1)  # +1 for cleanup
             self.progress_bar.setValue(0)
