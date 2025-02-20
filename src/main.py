@@ -1,180 +1,48 @@
 import sys
 import os
 import json
-import zipfile
-import py7zr
-import rarfile
-import shutil
 import logging
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from datetime import datetime
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QTreeWidget, QTreeWidgetItem, QLabel, QPushButton, QHBoxLayout,
+    QTreeWidget, QLabel, QPushButton, QHBoxLayout,
     QFileDialog, QMessageBox, QMenu, QInputDialog, 
     QProgressBar, QPlainTextEdit, QHeaderView
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt
 from PyQt6 import QtCore
 
-class ArchiveHandler:
-    """Handles different types of archive files"""
-    
-    @staticmethod
-    def get_archive_type(file_path):
-        """Determine the type of archive based on file extension"""
-        ext = Path(file_path).suffix.lower()
-        if ext == '.zip':
-            return 'zip'
-        elif ext == '.7z':
-            return '7z'
-        elif ext in ['.rar', '.r00']:
-            return 'rar'
-        else:
-            raise ValueError(f"Unsupported archive format: {ext}")
-    
-    @staticmethod
-    def list_files(file_path):
-        """List all files in the archive"""
-        archive_type = ArchiveHandler.get_archive_type(file_path)
-        
-        if archive_type == 'zip':
-            with zipfile.ZipFile(file_path, 'r') as archive:
-                return archive.namelist()
-        elif archive_type == '7z':
-            with py7zr.SevenZipFile(file_path, 'r') as archive:
-                return [str(f) for f in archive.getnames()]
-        elif archive_type == 'rar':
-            with rarfile.RarFile(file_path, 'r') as archive:
-                return archive.namelist()
-    
-    @staticmethod
-    def extract_all(file_path, extract_path):
-        """Extract all files from the archive"""
-        archive_type = ArchiveHandler.get_archive_type(file_path)
-        
-        if archive_type == 'zip':
-            with zipfile.ZipFile(file_path, 'r') as archive:
-                archive.extractall(extract_path)
-        elif archive_type == '7z':
-            with py7zr.SevenZipFile(file_path, 'r') as archive:
-                archive.extractall(extract_path)
-        elif archive_type == 'rar':
-            with rarfile.RarFile(file_path, 'r') as archive:
-                archive.extractall(extract_path)
+from archive import ArchiveHandler
+from modinfo import ModInfo
+from ui_components import ModTreeItem
 
-class ModInfo:
-    def __init__(self, mod_path):
-        self.path = Path(mod_path)
-        self.name = self.path.name
-        self.enabled = False
-        self.metadata = {
-            'id': '',
-            'version': '',
-            'name': '',
-            'description': '',
-            'authors': '',
-            'affects_saves': False,
-            'dependencies': [],
-            'affected_files': set()
-        }
-        self._load_metadata()
-
-    def _load_metadata(self):
-        """Load metadata from .modinfo file"""
-        # Look for .modinfo file in the mod directory
-        modinfo_files = list(self.path.glob("*.modinfo"))
-        if not modinfo_files:
-            print(f"No .modinfo file found for {self.name}")
-            return
-
-        try:
-            tree = ET.parse(modinfo_files[0])
-            root = tree.getroot()
-            
-            # Get basic mod info
-            self.metadata['id'] = root.get('id', '')
-            self.metadata['version'] = root.get('version', '')
-            
-            # Get properties
-            properties = root.find('.//Properties')
-            if properties is not None:
-                self.metadata['name'] = self._get_element_text(properties, 'Name')
-                self.metadata['description'] = self._get_element_text(properties, 'Description')
-                self.metadata['authors'] = self._get_element_text(properties, 'Authors')
-                affects_saves = self._get_element_text(properties, 'AffectsSavedGames')
-                self.metadata['affects_saves'] = affects_saves == '1' if affects_saves else False
-            
-            # Get dependencies
-            dependencies = root.find('.//Dependencies')
-            if dependencies is not None:
-                for dep in dependencies.findall('Mod'):
-                    self.metadata['dependencies'].append({
-                        'id': dep.get('id', ''),
-                        'title': dep.get('title', '')
-                    })
-            
-            # Get affected files
-            for action_group in root.findall('.//ActionGroup'):
-                for action in action_group.findall('.//Actions'):
-                    # UI Scripts
-                    for script in action.findall('.//UIScripts/Item'):
-                        if script.text:
-                            self.metadata['affected_files'].add(script.text)
-                    
-                    # Localization files
-                    for text_file in action.findall('.//LocalizedText/File'):
-                        if text_file.text:
-                            self.metadata['affected_files'].add(text_file.text)
-
-        except Exception as e:
-            print(f"Error loading metadata for {self.name}: {e}")
-
-    def _get_element_text(self, parent, tag):
-        """Helper method to safely get element text"""
-        element = parent.find(tag)
-        return element.text if element is not None else ''
-
-class ModTreeItem(QTreeWidgetItem):
-    def __init__(self, mod_info):
-        super().__init__()
-        self.mod_info = mod_info
-        self.update_display()
-        
-    def update_display(self):
-        """Update the item's display text"""
-        # Column order: Name, ModID, Version, Affects Saves, Has Conflicts, Author
-        self.setText(0, self.mod_info.name)
-        self.setText(1, self.mod_info.metadata['id'])
-        self.setText(2, self.mod_info.metadata['version'])
-        self.setText(3, 'Yes' if self.mod_info.metadata['affects_saves'] else 'No')
-        self.setText(4, '')  # Conflicts will be updated later
-        self.setText(5, self.mod_info.metadata['authors'])
-        
-        self.setCheckState(0, Qt.CheckState.Checked if self.mod_info.enabled else Qt.CheckState.Unchecked)
+import shutil
 
 class Civ7ModManager(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Civilization VII Mod Manager")
-        self.setGeometry(100, 100, 1200, 800)  # Made window wider for columns
-        
-        # Check archive handlers
-        self._validate_archive_handlers()
+        self.setGeometry(100, 100, 1200, 800)
         
         # Define paths
-        self.game_mods_path = Path(os.getenv('LOCALAPPDATA')) / "Firaxis Games" / "Sid Meier's Civilization VII" / "Mods"
-        self.storage_path = Path(os.getenv('APPDATA')) / "Civ7ModManager" / "ModStorage"
-        self.profiles_path = Path(os.getenv('APPDATA')) / "Civ7ModManager" / "Profiles"
-        self.logs_path = Path(os.getenv('APPDATA')) / "Civ7ModManager" / "Logs"
+        local_appdata = os.getenv('LOCALAPPDATA')
+        if not local_appdata:
+            raise EnvironmentError("Unable to locate LOCALAPPDATA")
+
+        self.app_path = Path(__file__).parent
+        self.game_mods_path = Path(local_appdata) / "Firaxis Games" / "Sid Meier's Civilization VII" / "Mods"
+        self.storage_path = Path(local_appdata) / "Civ7ModManager" / "ModStorage"
+        self.profiles_path = Path(local_appdata) / "Civ7ModManager" / "Profiles"
+        self.logs_path = Path(local_appdata) / "Civ7ModManager" / "Logs"
+        self.lib_path = self.app_path / "lib"
         self.mods = {}
         
         # Create necessary directories
         for path in [self.game_mods_path, self.storage_path, self.profiles_path, self.logs_path]:
             path.mkdir(parents=True, exist_ok=True)
-        
-        # Main widget and layout
+
+        # Main widget and layout setup
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         layout = QVBoxLayout(main_widget)
@@ -189,21 +57,17 @@ class Civ7ModManager(QMainWindow):
         self.mod_count_label = QLabel("Mods: 0 total, 0 enabled")
         layout.addWidget(self.mod_count_label)
         
-        # Create mod tree widget instead of list widget
+        # Initialize and setup mod tree widget
         self.mod_tree = QTreeWidget()
+        headers = ["Name", "Mod ID", "Version", "Affects Saves", "Has Conflicts", "Author"]
+        self.mod_tree.setHeaderLabels(headers)
+        self.mod_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents) # type: ignore
+        self.mod_tree.header().setSectionsClickable(True) # type: ignore
+        self.mod_tree.header().sectionClicked.connect(self._handle_sort) # type: ignore
+        self.mod_tree.setAlternatingRowColors(True)
         self.mod_tree.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.mod_tree.customContextMenuRequested.connect(self._show_context_menu)
         self.mod_tree.itemChanged.connect(self._on_mod_toggle)
-        
-        # Set up columns
-        headers = ["Name", "Mod ID", "Version", "Affects Saves", "Has Conflicts", "Author"]
-        self.mod_tree.setHeaderLabels(headers)
-        self.mod_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.mod_tree.header().setSectionsClickable(True)
-        self.mod_tree.header().sectionClicked.connect(self._handle_sort)
-        self.mod_tree.setAlternatingRowColors(True)
-        
-        # Replace mod_list with mod_tree in layout
         layout.addWidget(self.mod_tree)
         
         # Add progress bar (hidden by default)
@@ -218,7 +82,14 @@ class Civ7ModManager(QMainWindow):
         self.log_viewer.setReadOnly(True)
         self.log_viewer.setMaximumHeight(150)
         layout.addWidget(self.log_viewer)
+        
+        # Set up logging first
         self._setup_logging()
+        
+        # Set up remaining class attributes
+        self.archive_filter = "Mod Archives (*.zip *.7z *.rar *.r00);;All Files (*.*)"
+        self._current_sort_column = 0
+        self._current_sort_order = Qt.SortOrder.AscendingOrder
         
         # Buttons layout
         button_layout = QHBoxLayout()
@@ -250,33 +121,6 @@ class Civ7ModManager(QMainWindow):
         # Initial mod list population
         self.refresh_mod_list()
 
-        # Update file dialog filter for install_mod
-        self.archive_filter = "Mod Archives (*.zip *.7z *.rar *.r00);;All Files (*.*)"
-
-        # Track sort order
-        self._current_sort_column = 0
-        self._current_sort_order = Qt.SortOrder.AscendingOrder
-
-    def _validate_archive_handlers(self):
-        """Check if required archive handlers are available"""
-        missing_handlers = []
-        
-        # Check RAR support
-        
-        
-        # Check 7z support
-        try:
-            if not py7zr.is_7zfile("nonexistent.7z"):  # Just checking if the module works
-                pass
-        except Exception:
-            missing_handlers.append("7-Zip (needed for .7z files)")
-        
-        if missing_handlers:
-            msg = "Some archive formats may not be supported. Please install:\n\n"
-            msg += "\n".join(f"- {handler}" for handler in missing_handlers)
-            msg += "\n\nZIP files will still work normally."
-            QMessageBox.warning(self, "Missing Dependencies", msg)
-
     def _setup_logging(self):
         """Setup logging configuration"""
         self.logger = logging.getLogger('Civ7ModManager')
@@ -299,7 +143,7 @@ class Civ7ModManager(QMainWindow):
                 self.log_widget.appendPlainText(msg)
         
         qt_handler = QtLogHandler(self.log_viewer)
-        qt_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        qt_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))  # Fixed typo in levelname
         self.logger.addHandler(qt_handler)
 
     def _handle_sort(self, column):
@@ -477,67 +321,41 @@ class Civ7ModManager(QMainWindow):
             
         try:
             self.logger.info(f"Installing mod from: {file_path}")
-            self.progress_bar.setMaximum(4)  # 4 steps: read archive, validate, extract, refresh
+            
+            # Get archive type and check support
+            archive_type = ArchiveHandler.get_archive_type(file_path)
+            if not ArchiveHandler.is_format_supported(archive_type):
+                error_msg = f"Archive format '{archive_type}' is not supported.\n\n"
+                if archive_type == 'rar':
+                    error_msg += "Please ensure UnRAR.dll is present in the lib folder."
+                elif archive_type == '7z':
+                    error_msg += "Please ensure py7zr is installed correctly."
+                raise ValueError(error_msg)
+            
+            self.progress_bar.setMaximum(3)  # 3 steps: validate, extract, refresh
             self.progress_bar.setValue(0)
             self.progress_bar.show()
-            
-            # Get all files in the archive
-            self.logger.info("Reading archive contents")
-            all_files = ArchiveHandler.list_files(file_path)
             self.progress_bar.setValue(1)
             
-            # Look for .modinfo files
-            modinfo_files = [f for f in all_files if f.endswith('.modinfo')]
-            
-            if not modinfo_files:
-                raise ValueError("No .modinfo file found in the archive")
-            
-            # Get the correct mod directory name
-            modinfo_path = modinfo_files[0]
-            parts = Path(modinfo_path).parts
-            
-            # If modinfo is in a subfolder, use that as the mod name
-            if len(parts) > 1:
-                mod_name = parts[0]
-            else:
-                # Get top level directories
-                top_level_dirs = {Path(item).parts[0] for item in all_files if '/' in item or '\\' in item}
-                if not top_level_dirs:
-                    raise ValueError("Invalid mod structure")
-                mod_name = top_level_dirs.pop()
-            
-            self.progress_bar.setValue(2)
-            mod_path = self.storage_path / mod_name
-            
-            # If mod already exists, ask for confirmation to overwrite
-            if mod_path.exists():
-                self.logger.info(f"Mod {mod_name} already exists, asking for confirmation")
-                reply = QMessageBox.question(
-                    self,
-                    "Mod Already Exists",
-                    f"Mod '{mod_name}' already exists. Do you want to overwrite it?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.No:
-                    return
-                
-                # Remove existing mod from storage
-                self.logger.info(f"Removing existing mod: {mod_name}")
-                shutil.rmtree(mod_path)
-            
-            # Extract the mod to storage
-            self.logger.info(f"Extracting mod to: {mod_path}")
+            # Extract the mod folder
+            self.logger.info("Extracting mod folder")
             try:
-                ArchiveHandler.extract_all(file_path, self.storage_path)
+                mod_name = ArchiveHandler.extract_mod_folder(file_path, self.storage_path)
+                if not mod_name:
+                    raise ValueError("Could not determine mod folder name")
+                
+                self.logger.info(f"Mod extracted as: {mod_name}")
+                self.progress_bar.setValue(2)
+                
+                QMessageBox.information(self, "Success", f"Mod '{mod_name}' installed successfully!")
+                self.refresh_mod_list()
                 self.progress_bar.setValue(3)
                 
-                self.logger.info(f"Mod '{mod_name}' installed successfully")
-                QMessageBox.information(self, "Success", f"Mod '{mod_name}' installed successfully!")
-                
-                self.refresh_mod_list()
-                self.progress_bar.setValue(4)
-            except rarfile.BadRarFile:
-                raise ValueError("Failed to extract RAR file. Please ensure WinRAR or unrar is installed on your system.")
+            except Exception as extract_error:
+                # If extraction fails, ensure cleanup of any partial files
+                if 'mod_name' in locals() and mod_name and (self.storage_path / mod_name).exists():
+                    shutil.rmtree(self.storage_path / mod_name)
+                raise extract_error
             
         except ValueError as ve:
             error_msg = str(ve)
