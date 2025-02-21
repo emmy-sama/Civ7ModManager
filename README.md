@@ -16,7 +16,7 @@ A desktop application for managing, installing, and deploying mods for Civilizat
 ## Installation
 
 ### Option 1: Download Pre-built Release
-Download the latest release from the [Releases](https://github.com/[username]/Civ7ModManager/releases) page on GitHub.
+Download the latest release from the [Releases](https://github.com/emmy-sama/Civ7ModManager/releases) page on GitHub.
 
 ### Option 2: Run from Source
 1. Ensure you have Python installed on your system
@@ -94,3 +94,5 @@ Civ7ModManager/
 Feel free to submit issues and enhancement requests!
 
 ## Known Issues
+1. Ive tested most mods on civfanatics but a few have broken .modinfo files,
+   they will still work some information will be missing.
