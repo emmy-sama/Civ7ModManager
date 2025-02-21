@@ -74,14 +74,13 @@ class ModInfo:
             # Get dependencies
             dependencies_list = []
             dependencies = root.find(f'.//{ns_prefix}Dependencies')
-            if dependencies is None:
-                raise ET.ParseError('Dependencies element not found')
-                
-            for dep in dependencies.findall(f'.//{ns_prefix}Mod'):
-                dependencies_list.append({
-                    'id': dep.get('id', ''),
-                    'title': dep.get('title', '')
-                })
+            
+            if dependencies is not None:
+                for dep in dependencies.findall(f'.//{ns_prefix}Mod'):
+                    dependencies_list.append({
+                        'id': dep.get('id', ''),
+                        'title': dep.get('title', '')
+                    })
             
             # Get affected files from all action groups
             update_db_set = set()
