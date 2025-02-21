@@ -63,7 +63,7 @@ class Civ7ModManager(QMainWindow):
         
         # Initialize and setup mod tree widget
         self.mod_tree = QTreeWidget()
-        headers = ["Name", "Mod ID", "Version", "Author" "Affects Saves", "Has Conflicts"]
+        headers = ["Name", "Mod ID", "Version", "Author", "Affects Saves", "Has Conflicts"]
         self.mod_tree.setHeaderLabels(headers)
         header = self.mod_tree.header()
         if not header:
@@ -148,7 +148,7 @@ class Civ7ModManager(QMainWindow):
         """Setup logging configuration"""
         
         self.logger = logging.getLogger('Civ7ModManager')
-        self.logger.setLevel(logging.ERROR)
+        self.logger.setLevel(logging.INFO)
         
         # File handler
         log_file = self.logs_path / f"modmanager_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -317,7 +317,7 @@ class Civ7ModManager(QMainWindow):
             item = root.child(i)
             if item:
                 item.setCheckState(0, Qt.CheckState.Unchecked)
-                self.mod_info.enabled = False
+                item.mod_info.enabled = False
                 
         self._update_mod_count()
         self._update_conflicts()
@@ -379,11 +379,6 @@ class Civ7ModManager(QMainWindow):
     def install_mod(self) -> None:
         """Install a new mod from an archive file"""
         
-        self.progress_bar.setMaximum(3)
-        self.progress_bar.setValue(0)
-        self.progress_bar.show()
-        
-        # Step 1: Select mod archive file
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Mod Archive",
@@ -393,21 +388,17 @@ class Civ7ModManager(QMainWindow):
         
         if not file_path:
             return
-        self.progress_bar.setValue(1)
         
-        # Step 2: Extract mod folder
         self.logger.info(f"Installing mod from: {file_path}")
         try:
             mod_name = ArchiveHandler.extract_mod_folder(file_path, self.storage_path)
             if not mod_name:
                 raise ValueError("Could not determine mod folder name")
             
-            self.logger.info(f"Mod extracted as: {mod_name}")
-            self.progress_bar.setValue(2)
+            self.logger.info(f"Mod extracted as: {mod_name[1]}")
             
-            QMessageBox.information(self, "Success", f"Mod '{mod_name}' installed successfully!")
+            QMessageBox.information(self, "Success", f"Mod '{mod_name[1]}' installed successfully!")
             self.refresh_mod_list()
-            self.progress_bar.setValue(3)
             
         except ValueError as ve:
             error_msg = str(ve)
@@ -417,8 +408,6 @@ class Civ7ModManager(QMainWindow):
             error_msg = f"Failed to install mod: {str(e)}"
             self.logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
-        finally:
-            self.progress_bar.hide()
 
     def install_mod_folder(self) -> None:
         """Install multiple mods from a folder"""
