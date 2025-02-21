@@ -467,7 +467,7 @@ class Civ7ModManager(QMainWindow):
                 self.progress_bar.setValue(i + 1)
             
             # Show results
-            result_message = f"Successfully installed {successful_installs - 1} mod{'s' if successful_installs != 1 else ''}"
+            result_message = f"Successfully installed {successful_installs} mod{'s' if successful_installs != 1 else ''}"
             if failed_installs:
                 result_message += "\n\nFailed installations:"
                 for mod_name, error in failed_installs:
