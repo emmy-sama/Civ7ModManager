@@ -391,7 +391,7 @@ class Civ7ModManager(QMainWindow):
         
         self.logger.info(f"Installing mod from: {file_path}")
         try:
-            mod_name = ArchiveHandler.extract_mod_folder(file_path, self.storage_path)
+            mod_name = ArchiveHandler.extract_mod_folder(file_path, str(self.storage_path))
             if not mod_name:
                 raise ValueError("Could not determine mod folder name")
             
@@ -458,7 +458,7 @@ class Civ7ModManager(QMainWindow):
                 self.logger.info(f"Installing mod from: {file_path}")
                 mod_name = ArchiveHandler.extract_mod_folder(file_path, str(self.storage_path))
                 if mod_name:
-                    self.logger.info(f"Successfully installed: {mod_name}")
+                    self.logger.info(f"Successfully installed: {mod_name[1]}")
                     successful_installs += 1
                 else:
                     self.logger.error(f"Failed to install {file_path.name}: {mod_name[1]}")
