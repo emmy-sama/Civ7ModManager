@@ -69,7 +69,9 @@ class ModInfo:
             
             affects_saves = properties.find(f'{ns_prefix}AffectsSavedGames')
             if affects_saves is None:
-                raise ET.ParseError('AffectsSavedGames element not found')
+                affects_saves = 0
+            else:
+                affects_saves = affects_saves.text
             
             # Get dependencies
             dependencies_list = []
@@ -102,7 +104,7 @@ class ModInfo:
                         for item in update_text.findall(f'.//{ns_prefix}Item'):
                             if item.text:
                                 update_text_set.add(item.text.strip())
-                                             
+                                
                     # Process UIScripts actions
                     for ui_scripts in actions.findall(f'.//{ns_prefix}UIScripts'):
                         for item in ui_scripts.findall(f'.//{ns_prefix}Item'):
@@ -114,9 +116,6 @@ class ModInfo:
                         for item in import_files.findall(f'.//{ns_prefix}Item'):
                             if item.text:
                                 import_files_set.add(item.text.strip())
-            
-            if not update_db_set and not update_text_set and not ui_scripts_set and not import_files_set:
-                raise ET.ParseError('No affected files found')
             
             # Set metadata now that we should have all required info
             self.metadata['id'] = id
