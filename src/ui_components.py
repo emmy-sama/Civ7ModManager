@@ -9,12 +9,14 @@ class ModTreeItem(QTreeWidgetItem):
         
     def update_display(self):
         """Update the item's display text"""
-        # Column order: Name, ModID, Version, Affects Saves, Has Conflicts, Author
+        
+        # Column order: Name, ModID, Version, Author, Affects Saves, Has Conflicts
         self.setText(0, self.mod_info.metadata['display_name'])
         self.setText(1, self.mod_info.metadata['id'])
         self.setText(2, self.mod_info.metadata['version'])
-        self.setText(3, 'Yes' if self.mod_info.metadata['affects_saves'] else 'No')
-        self.setText(4, 'Yes' if self.mod_info.conflicts else 'No')
-        self.setText(5, self.mod_info.metadata['authors'])
+        self.setText(3, self.mod_info.metadata['authors'])
+        self.setText(4, 'Yes' if self.mod_info.metadata['affects_saves'] else 'No')
+        self.setText(5, 'Yes' if self.mod_info.conflicts else 'No')
+        self.setForeground(5, Qt.GlobalColor.red if self.mod_info.conflicts else Qt.GlobalColor.white)
         
         self.setCheckState(0, Qt.CheckState.Checked if self.mod_info.enabled else Qt.CheckState.Unchecked)
