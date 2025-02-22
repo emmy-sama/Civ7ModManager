@@ -1,4 +1,3 @@
-venv-*
 *.code-workspace
 build/*
 dist/*
