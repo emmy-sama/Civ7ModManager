@@ -93,6 +93,11 @@ Civ7ModManager/
 
 Feel free to submit issues and enhancement requests!
 
+## Planed Ideas
+1. Ask before overwriting a existing mod
+2. Check for mods in the current civ mods folder to see which are enabled
+
 ## Known Issues
 1. Ive tested most mods on civfanatics but a few have broken .modinfo files,
    they will still work some information will be missing.
+2. Rar files cant find UnRar.exe int he built version of the app
