@@ -1,4 +1,3 @@
-*.spec
 *.code-workspace
 build/*
 dist/*
