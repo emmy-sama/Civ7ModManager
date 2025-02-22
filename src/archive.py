@@ -1,5 +1,7 @@
 import shutil
 import subprocess
+import sys
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -49,11 +51,14 @@ class ArchiveHandler:
                         archive.extractall(temp_extract)
                 case 'rar':
                     try:
-                        app_path = Path(__file__).parent.parent
-                        unrar_path = app_path / "lib" / "UnRAR.exe"
+                        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+                        unrar_path = Path(os.path.join(base_path, "lib", "UnRAR.exe"))
                         
                         if not unrar_path.exists():
                             raise ArchiveError(f"UnRAR executable not found at {unrar_path}")
+                        if not os.access(unrar_path, os.X_OK):
+                            raise ArchiveError(f"UnRAR executable does not execute permissions")
+                        
                         subprocess.run(
                             [str(unrar_path), "x", str(file_path), str(temp_extract) + "\\", "-r", "-y"],
                             check=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW
