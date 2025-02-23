@@ -18,11 +18,15 @@ A desktop application for managing, installing, and deploying mods for Civilizat
 ### Option 1: Download Pre-built Release
 Download the latest release from the [Releases](https://github.com/emmy-sama/Civ7ModManager/releases) page on GitHub.
 
-### Option 2: Run from Source
+### Option 2: Build from Source
 1. Ensure you have Python installed on your system
 2. Install the required dependencies:
 ```bash
 pip install -r requirements.txt
+```
+3. Run pyinstaller to build
+```bash
+pyinstaller .\civ7modmanager.spec
 ```
 
 ## Usage
@@ -96,8 +100,5 @@ Feel free to submit issues and enhancement requests!
 ## Planed Ideas
 1. Ask before overwriting a existing mod
 2. Check for mods in the current civ mods folder to see which are enabled
-
-## Known Issues
-1. Ive tested most mods on civfanatics but a few have broken .modinfo files,
-   they will still work some information will be missing.
-2. Rar files cant find UnRar.exe int he built version of the app
+3. Handle installing mutiple mods from a zip instead of just a dic
+4. Change XML parsing to try and handle broken xml files
