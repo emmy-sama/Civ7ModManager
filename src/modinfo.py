@@ -19,9 +19,7 @@ class ModInfo:
             'affected_files': set()
         }
         self._load_metadata()
-
-    
-
+        
     def _load_metadata(self):
         """Load metadata from .modinfo file"""
         
@@ -57,7 +55,7 @@ class ModInfo:
             
             # First try to get the name directly
             final_name = self.folder_name
-            direct_name: ET.Element | None = properties.find(f'{ns_prefix}Name')
+            direct_name: str | None = properties.find(f'{ns_prefix}Name').text
             if direct_name is None:
                 raise ET.ParseError('Name element not found')
             
@@ -66,6 +64,8 @@ class ModInfo:
                 localized_name = self._get_localized_name(direct_name)
                 if localized_name:
                     final_name = localized_name
+            else:
+                final_name = direct_name
             
             affects_saves = properties.find(f'{ns_prefix}AffectsSavedGames')
             if affects_saves is None:
@@ -143,7 +143,7 @@ class ModInfo:
         
         loc_file_path = self.path / "text" / "en_us" / "ModuleText.xml"
         if not loc_file_path.exists():
-            raise FileNotFoundError
+            return None
         
         try:
             tree = ET.parse(loc_file_path)
