@@ -68,7 +68,7 @@ good starting place for now.
 ## Technical Details
 
 The application is built using:
-- Python with PyQt6 for the GUI
+- Python with Pyside6 for the GUI
 - XML parsing for mod metadata
 - Multiple archive format support (ZIP, RAR, 7Z)
 - Github Copilot Claude 3.5 (Including this file im very bad at writing haha)
@@ -76,29 +76,4 @@ The application is built using:
 ## Requirements
 
 - Python 3.x
-- PyQt6
 - Additional requirements listed in `requirements.txt`
-
-## Project Structure
-
-```
-Civ7ModManager/
-├── lib/
-│   └── UnRAR.exe         # Required for RAR archive support
-├── src/
-│   ├── main.py           # Main application entry point
-│   ├── modinfo.py        # Mod metadata handling
-│   ├── archive.py        # Archive extraction utilities
-│   └── ui_components.py  # UI component classes
-└── requirements.txt      # Python dependencies
-```
-
-## Contributing
-
-Feel free to submit issues and enhancement requests!
-
-## Planed Ideas
-1. Ask before overwriting a existing mod
-2. Check for mods in the current civ mods folder to see which are enabled
-3. Handle installing mutiple mods from a zip instead of just a dic
-4. Change XML parsing to try and handle broken xml files
