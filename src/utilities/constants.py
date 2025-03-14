@@ -3,7 +3,7 @@ from PySide6.QtGui import QFont
 
 
 # Application version
-APP_VERSION = "0.1.2"
+APP_VERSION = "0.2.0"
 
 # URLs
 GITHUB_URL = "https://github.com/emmy-sama/Civ7ModManager"
