@@ -26,7 +26,7 @@ pip install -r requirements.txt
 ```
 3. Run pyinstaller to build
 ```bash
-pyinstaller .\civ7modmanager.spec
+pyinstaller .\civ7modmanager.spec -y
 ```
 
 ## Usage
