@@ -1,3 +1,6 @@
+Deprecated Use this amazing tool instead -> https://github.com/rockfactory/civ7-mods-hub
+
+
 # Civilization VII Mod Manager
 
 A desktop application for managing, installing, and deploying mods for Civilization VII.
