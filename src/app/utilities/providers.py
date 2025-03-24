@@ -9,8 +9,8 @@ import aiohttp
 from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 
-from utilities.modinfo_parser import ModInfo
-from utilities.constants import CIVFANATICS_BASE_URL, CIVFANATICS_CIV7_URL
+from .modinfo_parser import ModInfo
+from .constants import CIVFANATICS_BASE_URL, CIVFANATICS_CIV7_URL
 
 
 class ParserError(Exception):

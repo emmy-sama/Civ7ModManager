@@ -13,7 +13,7 @@ from datetime import datetime
 from dataclasses import field
 from bs4 import BeautifulSoup, Tag
 
-from utilities.constants import BASE_GAME_MODS, DLC_MODS
+from .constants import BASE_GAME_MODS, DLC_MODS
 
 FILEACTION = Literal["update_db", "update_text", "ui_scripts", "import_files"]
 PROVIDERS = Literal["local", "civfanatics"]

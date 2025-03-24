@@ -7,7 +7,7 @@ from typing import Sequence
 from qasync import QEventLoop
 from PySide6.QtWidgets import QApplication
 
-from ui.main_window import Civ7ModManager
+from .ui.main_window import Civ7ModManager
 
 
 class Civ7ModManagerApp(QApplication):

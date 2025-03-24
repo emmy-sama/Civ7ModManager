@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, NamedTuple
 
-from utilities.modinfo_parser import ModInfo
+from .modinfo_parser import ModInfo
 
 
 class ModCount(NamedTuple):
