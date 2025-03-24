@@ -11,10 +11,10 @@ from PySide6.QtWidgets import (
     QStatusBar, QFrame, QMenu, QWidget
 )
 
-from utilities.config import ModManagerPaths
-from utilities.database import ModDatabase, ModCount
-from utilities.constants import APP_VERSION, DEFAULT_ICON_SIZE, DEFAULT_BUTTON_HEIGHT
-from ui.ui_components import ModTableItem
+from ..utilities.config import ModManagerPaths
+from ..utilities.database import ModDatabase, ModCount
+from ..utilities.constants import APP_VERSION, DEFAULT_ICON_SIZE, DEFAULT_BUTTON_HEIGHT
+from .ui_components import ModTableItem
 
 from . import BasePage
 

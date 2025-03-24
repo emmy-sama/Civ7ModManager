@@ -14,12 +14,12 @@ from PySide6.QtWidgets import (
     QStatusBar, QFileDialog, QHeaderView, QMenu,
 )
 
-from utilities.config import ModManagerPaths
-from utilities.database import ModDatabase
-from utilities.providers import CivFanaticsProvider, ParserError
-from utilities.modinfo_parser import parse_modinfo, ModInfo, ParseError
-from ui.ui_components import StarRatingWidget, ModActionWidget
-import utilities.archive as Ah
+from ..utilities.config import ModManagerPaths
+from ..utilities.database import ModDatabase
+from ..utilities.providers import CivFanaticsProvider, ParserError
+from ..utilities.modinfo_parser import parse_modinfo, ModInfo, ParseError
+from .ui_components import StarRatingWidget, ModActionWidget
+from ..utilities import archive as Ah
 
 from . import BasePage
 

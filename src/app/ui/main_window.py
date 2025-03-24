@@ -4,17 +4,17 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget
 
-from utilities.config import ModManagerPaths
-from utilities.logging_setup import init_logging
-from utilities.database import ModDatabase
-from utilities.constants import (
+from ..utilities.config import ModManagerPaths
+from ..utilities.logging_setup import init_logging
+from ..utilities.database import ModDatabase
+from ..utilities.constants import (
     APP_VERSION, GITHUB_URL, CIVFANATICS_MOD_URL,
     DEFAULT_WINDOW_SIZE, DEFAULT_NAV_WIDTH, DEFAULT_BUTTON_HEIGHT, MAINFONT
 )
 
-from ui.installed_page import InstalledModsPage
-from ui.get_mods_page import GetModsPage
-from ui.options_page import OptionsPage
+from .installed_page import InstalledModsPage
+from .get_mods_page import GetModsPage
+from .options_page import OptionsPage
 
 
 class Civ7ModManager(QMainWindow):

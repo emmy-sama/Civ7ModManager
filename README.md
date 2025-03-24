@@ -22,14 +22,14 @@ A desktop application for managing, installing, and deploying mods for Civilizat
 Download the latest release from the [Releases](https://github.com/emmy-sama/Civ7ModManager/releases) page on GitHub.
 
 ### Option 2: Build from Source
-1. Ensure you have Python installed on your system
+1. Ensure you have Python 3.13 or higher installed on your system
 2. Install the required dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 3. Run pyinstaller to build
 ```bash
-pyinstaller .\civ7modmanager.spec
+pyinstaller src\civ7modmanager.spec -y
 ```
 
 ## Usage
@@ -78,5 +78,5 @@ The application is built using:
 
 ## Requirements
 
-- Python 3.x
+- Python 3.13 or higher
 - Additional requirements listed in `requirements.txt`

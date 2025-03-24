@@ -6,8 +6,8 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QVBoxLayout, QGroupBox, QMessageBox
 )
 
-from utilities.config import ModManagerPaths
-from utilities.database import ModDatabase
+from ..utilities.config import ModManagerPaths
+from ..utilities.database import ModDatabase
 
 from . import BasePage
 

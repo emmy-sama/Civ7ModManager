@@ -6,8 +6,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QPixmap
 
-from utilities.database import ModDatabase
-from utilities.constants import DEFAULT_ICON_SIZE
+from ..utilities.database import ModDatabase
+from ..utilities.constants import DEFAULT_ICON_SIZE
 
 
 class ModTableItem(QTableWidgetItem):
